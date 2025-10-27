@@ -442,13 +442,14 @@ async function renderPostView(author, permlink) {
             const replyAvatarUrl = blockchain.getAvatarUrl(reply.author);
             let quoteHtml = '';
             const parentKey = `@${reply.parent_author}/${reply.parent_permlink}`;
-            const parent = contentMap[parentKey];
-            if (parent) {
-                const parentBody = parent.body.substring(0, 100) + (parent.body.length > 100 ? '...' : '');
-                quoteHtml = `<blockquote class="blockquote-footer bg-light p-2 rounded-top"><a href="#${parentKey}">@${reply.parent_author}</a> wrote:<p class="mb-0 fst-italic">${parentBody}</p></blockquote>`;
-            }
+                        const parent = contentMap[parentKey];
+                        // Only show a quote if the reply is to another comment, not the main post.
+                        if (parent && (reply.parent_author !== post.author || reply.parent_permlink !== post.permlink)) {
+                            const parentBody = parent.body.substring(0, 100) + (parent.body.length > 100 ? '...' : '');
+                            quoteHtml = `<blockquote class="blockquote-footer bg-light p-2 rounded-top"><a href="?post=@${reply.parent_author}/${reply.parent_permlink}">@${reply.parent_author}</a> wrote:<p class="mb-0 fst-italic">${parentBody}</p></blockquote>`;
+                        }
             html += `
-                <div id="${parentKey}" class="list-group-item mt-3">
+                <div id="@${reply.author}/${reply.permlink}" class="list-group-item mt-3">
                     <div class="row">
                         <div class="col-md-3 text-center border-end">
                             <a href="?profile=${reply.author}"><img src="${replyAvatarUrl}" alt="${reply.author}" class="rounded-circle mb-2" width="40" height="40"><h6 class="mb-0">@${reply.author}</h6></a>
@@ -789,10 +790,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         const anchor = e.target.closest('a');
         if (!anchor) return;
 
-        if (anchor.hasAttribute('data-bs-toggle') && (anchor.getAttribute('data-bs-toggle') === 'modal' || anchor.getAttribute('data-bs-toggle') === 'dropdown')) {
-            e.preventDefault();
+        // Allow default behavior for in-page anchor links
+        if (anchor.hash && anchor.pathname === window.location.pathname && anchor.search === window.location.search) {
             return;
         }
+
+        // Prevent default for modal triggers OR dropdown triggers
 
         if ((anchor.href.includes('?category=') || anchor.href.includes('?post=') || anchor.href.includes('?new_topic_in=') || anchor.href.includes('?edit=') || anchor.href.includes('?profile=') || anchor.pathname === '/')) {
             const url = new URL(anchor.href);
