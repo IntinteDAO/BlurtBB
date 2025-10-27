@@ -421,7 +421,7 @@ async function renderPostView(author, permlink) {
                     </div>
                     <div class="col-md-9">
                         <h1 class="card-title">${post.title}</h1>
-                        <div class="card-text fs-5 mb-3">${renderMarkdown(post.body)}</div>
+                        <div class="card-text fs-5 mb-3 markdown-content">${renderMarkdown(post.body)}</div>
                         <div class="d-flex align-items-center justify-content-between mt-3">
                             <div class="d-flex align-items-center vote-section" data-author="${post.author}" data-permlink="${post.permlink}"></div>
                             <div>
@@ -458,7 +458,7 @@ async function renderPostView(author, permlink) {
                         </div>
                         <div class="col-md-9">
                             ${quoteHtml}
-                            <div class="mb-2">${renderMarkdown(reply.body)}</div>
+                            <div class="mb-2 markdown-content">${renderMarkdown(reply.body)}</div>
                             <div class="d-flex align-items-center justify-content-between mt-2">
                                 <div class="d-flex align-items-center vote-section" data-author="${reply.author}" data-permlink="${reply.permlink}"></div>
                                 <div>
@@ -477,6 +477,14 @@ async function renderPostView(author, permlink) {
     }
 
     appContainer.innerHTML = html;
+
+    // Wrap iframes for responsiveness after content is rendered
+    appContainer.querySelectorAll('.markdown-content iframe').forEach(iframe => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'responsive-iframe-container';
+        iframe.parentNode.insertBefore(wrapper, iframe);
+        wrapper.appendChild(iframe);
+    });
 
     if (user) {
         const deletePostBtn = document.getElementById('delete-post-btn');
