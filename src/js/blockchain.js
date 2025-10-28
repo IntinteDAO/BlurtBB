@@ -150,6 +150,14 @@ export async function broadcastPost(author, key, categoryId, title, body) {
         operations.push(beneficiaryOps);
     }
 
+    // Add self-vote operation
+    operations.push(['vote', {
+        voter: author,
+        author: author,
+        permlink: permlink,
+        weight: 10000 // 100% vote
+    }]);
+
     return new Promise((resolve, reject) => {
         blurt.broadcast.send({ operations, extensions: [] }, { posting: key }, (err, result) => {
             if (err) return reject(err);
@@ -183,10 +191,18 @@ export async function broadcastReply(author, key, parentAuthor, parentPermlink, 
         operations.push(beneficiaryOps);
     }
 
+    // Add self-vote operation
+    operations.push(['vote', {
+        voter: author,
+        author: author,
+        permlink: permlink,
+        weight: 10000 // 100% vote
+    }]);
+
     return new Promise((resolve, reject) => {
         blurt.broadcast.send({ operations, extensions: [] }, { posting: key }, (err, result) => {
             if (err) return reject(err);
-            resolve(result);
+            resolve({ result, permlink });
         });
     });
 }
