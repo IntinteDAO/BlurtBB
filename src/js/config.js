@@ -5,6 +5,12 @@ export const CONFIG = {
     "tag_prefix": "fdsfdsf-",
     "admins": ["fervi"],
     "moderators": [],
+    "RPC_NODES": [
+        "https://rpc.blurt.world",
+        "https://blurt-rpc.saboin.com",
+        "https://rpc.beblurt.com",
+        "https://blurtrpc.dagobert.uk"
+    ],
     "category_groups": [
         {
             "group_title": "Welcome",

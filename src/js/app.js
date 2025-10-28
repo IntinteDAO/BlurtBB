@@ -742,9 +742,15 @@ function applyTheme(themeName) {
 }
 
 function setupConfigModal() {
-    const rpcNodeInput = document.getElementById('rpc-node');
+    const rpcNodeSelect = document.getElementById('rpc-node-select');
     const useCoalCheckbox = document.getElementById('use-coal');
     const themeSelector = document.getElementById('theme-selector');
+
+    // Populate RPC nodes from config
+    CONFIG.RPC_NODES.forEach(node => {
+        const option = new Option(node, node);
+        rpcNodeSelect.add(option);
+    });
 
     // Populate themes
     BOOTSWATCH_THEMES.forEach(theme => {
@@ -753,14 +759,14 @@ function setupConfigModal() {
     });
 
     // Load current settings into the form
-    rpcNodeInput.value = settings.getSetting('RPC_URL');
+    rpcNodeSelect.value = settings.getSetting('RPC_URL');
     useCoalCheckbox.checked = settings.getSetting('USE_COAL');
     themeSelector.value = settings.getSetting('THEME');
 
     // Save handler
     document.getElementById('save-config').addEventListener('click', () => {
         const newSettings = {
-            RPC_URL: rpcNodeInput.value,
+            RPC_URL: rpcNodeSelect.value,
             USE_COAL: useCoalCheckbox.checked,
             THEME: themeSelector.value
         };
