@@ -347,9 +347,43 @@ async function renderCategoryView(categoryId) {
         topicData.sort((a, b) => new Date(b.lastPostDate) - new Date(a.lastPostDate));
 
         topicData.forEach(topic => {
+            // Notification Logic
+            const notificationKey = `notification-cache-${topic.author}-${topic.permlink}`;
+            const storedReplies = localStorage.getItem(notificationKey);
+            const currentReplies = topic.children;
+            let iconClass = 'fa-bell-slash text-muted'; // Default: read
+            let isNew = false;
+
+            if (storedReplies === null) {
+                localStorage.setItem(notificationKey, currentReplies);
+            } else {
+                if (currentReplies > parseInt(storedReplies, 10)) {
+                    iconClass = 'fa-bell text-primary'; // New replies
+                    isNew = true;
+                }
+            }
+
+            let notificationBellHtml = '';
+            if (isNew) {
+                notificationBellHtml = `
+                    <div class="text-center me-4 d-flex align-items-center">
+                        <a href="#" class="notification-bell" title="Mark as read" data-author="${topic.author}" data-permlink="${topic.permlink}" data-current-replies="${currentReplies}">
+                            <i class="fa-regular ${iconClass} fs-2 fa-fw"></i>
+                        </a>
+                    </div>
+                `;
+            } else {
+                notificationBellHtml = `
+                    <div class="text-center me-4 d-flex align-items-center" title="No new replies">
+                        <i class="fa-regular ${iconClass} fs-2 fa-fw"></i>
+                    </div>
+                `;
+            }
+
             const lastPostAvatarUrl = blockchain.getAvatarUrl(topic.lastPostAuthor);
             const lastPostHtml = `<div class="d-flex align-items-center" style="min-width: 180px;"><a href="?profile=${topic.lastPostAuthor}" class="me-2"><img src="${lastPostAvatarUrl}" class="rounded-circle" width="32" height="32" alt="${topic.lastPostAuthor}"></a><div><a href="?profile=${topic.lastPostAuthor}" class="text-break">@${topic.lastPostAuthor}</a><br><small class="text-muted"><a href="?post=@${topic.author}/${topic.permlink}" class="text-muted"><time datetime="${topic.lastPostDate}">${new Date(topic.lastPostDate).toLocaleString()}</time></a></small></div></div>`;
-            topicsHtml += `<li class="list-group-item"><div class="d-flex w-100 align-items-center"><div class="flex-grow-1"><h5 class="mb-1"><a href="?post=@${topic.author}/${topic.permlink}">${topic.title}</a></h5><small class="text-muted">By <a href="?profile=${topic.author}">@${topic.author}</a>, ${new Date(topic.created).toLocaleString()}</small></div><div class="text-center mx-4" style="min-width: 80px;"><span class="d-block fs-5">${topic.children}</span><small class="text-muted">replies</small></div>${lastPostHtml}</div></li>`;
+            
+            topicsHtml += `<li class="list-group-item"><div class="d-flex w-100 align-items-center">${notificationBellHtml}<div class="flex-grow-1"><h5 class="mb-1"><a href="?post=@${topic.author}/${topic.permlink}">${topic.title}</a></h5><small class="text-muted">By <a href="?profile=${topic.author}">@${topic.author}</a>, ${new Date(topic.created).toLocaleString()}</small></div><div class="text-center mx-4" style="min-width: 80px;"><span class="d-block fs-5">${topic.children}</span><small class="text-muted">replies</small></div>${lastPostHtml}</div></li>`;
         });
     } else {
         topicsHtml += '<li class="list-group-item">No topics found.</li>';
@@ -391,6 +425,11 @@ async function renderPostView(author, permlink) {
     }
     const post = await blockchain.getPostWithReplies(author, permlink);
     if (!post || !post.author) { renderNotFound(); return; }
+
+    // Mark topic as read by updating the notification cache
+    const notificationKey = `notification-cache-${post.author}-${post.permlink}`;
+    localStorage.setItem(notificationKey, post.children);
+
 
     document.title = `${post.title} - ${CONFIG.forum_title}`;
     const user = auth.getCurrentUser();
@@ -794,6 +833,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     loginForm.addEventListener('submit', handleLogin);
 
     document.body.addEventListener('click', e => {
+        // Handle notification bell clicks
+        const bellBtn = e.target.closest('.notification-bell');
+        if (bellBtn) {
+            e.preventDefault();
+            const { author, permlink, currentReplies } = bellBtn.dataset;
+            localStorage.setItem(`notification-cache-${author}-${permlink}`, currentReplies);
+
+            const readIconContainer = document.createElement('div');
+            readIconContainer.className = 'text-center me-4 d-flex align-items-center';
+            readIconContainer.title = 'No new replies';
+            readIconContainer.innerHTML = `<i class="fa-regular fa-bell-slash text-muted fs-2 fa-fw"></i>`;
+
+            bellBtn.parentElement.replaceWith(readIconContainer);
+            Toastify({ text: "Marked as read.", duration: 2000 }).showToast();
+            return; // Stop further processing
+        }
+
+        // If the click is not on a popover trigger or inside a popover, hide all popovers
         if (!e.target.closest('[data-bs-toggle="popover"]') && !e.target.closest('.popover')) {
             document.querySelectorAll('[data-bs-toggle="popover"]').forEach(popoverEl => {
                 const popover = bootstrap.Popover.getInstance(popoverEl);
