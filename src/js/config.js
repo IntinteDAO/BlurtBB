@@ -5,6 +5,7 @@ export const CONFIG = {
     "tag_prefix": "fdsfdsf-",
     "admins": ["fervi"],
     "moderators": [],
+    "IMAGE_UPLOAD_ENDPOINT": "https://img-upload.blurt.world",
     "RPC_NODES": [
         "https://rpc.blurt.world",
         "https://blurt-rpc.saboin.com",

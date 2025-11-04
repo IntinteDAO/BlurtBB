@@ -4,6 +4,7 @@ import * as auth from './auth.js';
 import * as blacklist from './blacklist.js';
 import * as beneficiaries from './beneficiaries.js';
 import * as settings from './settings.js';
+import { uploadImage } from './imageUploader.js';
 
 // Get DOM elements once
 const appContainer = document.getElementById('app');
@@ -430,7 +431,6 @@ async function renderPostView(author, permlink) {
     const notificationKey = `notification-cache-${post.author}-${post.permlink}`;
     localStorage.setItem(notificationKey, post.children);
 
-
     document.title = `${post.title} - ${CONFIG.forum_title}`;
     const user = auth.getCurrentUser();
     const postAuthorAvatarUrl = blockchain.getAvatarUrl(post.author);
@@ -547,6 +547,91 @@ async function renderPostView(author, permlink) {
     hideLoader();
 }
 
+function createEditor(element, options = {}) {
+    const editorOptions = {
+        element: element,
+        spellChecker: false,
+        toolbar: [
+            'bold', 'italic', 'heading', '|', 'quote', 'unordered-list', 'ordered-list', '|', 'link', 
+            {
+                name: "upload-image",
+                action: (editor) => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = 'image/*';
+                    input.onchange = async e => {
+                        const file = e.target.files[0];
+                        if (!file) return;
+                        handleImageUpload(editor, file);
+                    };
+                    input.click();
+                },
+                className: "fa fa-image",
+                title: "Upload Image",
+            },
+            '|', 'preview', 'side-by-side', 'fullscreen', '|', 'guide'
+        ],
+        ...options
+    };
+
+    const mde = new EasyMDE(editorOptions);
+    const cm = mde.codemirror;
+
+    cm.on('paste', (cm, event) => {
+        const items = (event.clipboardData || event.originalEvent.clipboardData).items;
+        for (const item of items) {
+            if (item.kind === 'file' && item.type.startsWith('image/')) {
+                event.preventDefault();
+                const file = item.getAsFile();
+                handleImageUpload(mde, file);
+                break;
+            }
+        }
+    });
+
+    cm.on('drop', (cm, event) => {
+        const items = event.dataTransfer.items;
+        for (const item of items) {
+            if (item.kind === 'file' && item.type.startsWith('image/')) {
+                event.preventDefault();
+                const file = item.getAsFile();
+                handleImageUpload(mde, file);
+                break;
+            }
+        }
+    });
+
+    return mde;
+}
+
+function handleImageUpload(editor, file) {
+    const cm = editor.codemirror;
+    const placeholder = `![Uploading ${file.name}...]()`;
+    cm.replaceSelection(placeholder);
+
+    const progressCallback = (progress) => {
+        if (progress.message) {
+            Toastify({ text: progress.message, duration: 2000 }).showToast();
+        }
+        if (progress.error) {
+            Toastify({ text: `Upload Error: ${progress.error}`, backgroundColor: 'red' }).showToast();
+            const currentText = cm.getValue();
+            cm.setValue(currentText.replace(placeholder, `![Upload failed for ${file.name}]()`));
+        }
+        if (progress.url) {
+            Toastify({ text: 'Image uploaded successfully!', backgroundColor: 'green' }).showToast();
+            const newText = `![${file.name}](${progress.url})`;
+            const currentText = cm.getValue();
+            cm.setValue(currentText.replace(placeholder, newText));
+        }
+    };
+
+    uploadImage(file, progressCallback).catch(err => {
+        // The error is already handled in the callback, but we catch it here to prevent unhandled promise rejections.
+        console.error("Final upload error:", err);
+    });
+}
+
 function renderReplyForm(parentAuthor, parentPermlink, container) {
     if (easyMDEInstance) {
         try { easyMDEInstance.toTextArea(); } catch(e) {}
@@ -566,11 +651,7 @@ function renderReplyForm(parentAuthor, parentPermlink, container) {
     
     if (container) {
         container.innerHTML = formHtml;
-        easyMDEInstance = new EasyMDE({
-            element: document.getElementById('reply-body'),
-            spellChecker: false,
-            placeholder: "Enter your reply...",
-        });
+        easyMDEInstance = createEditor(document.getElementById('reply-body'), { placeholder: "Enter your reply..." });
         document.getElementById('reply-form').addEventListener('submit', (e) => handleReplySubmit(e, parentAuthor, parentPermlink));
         document.getElementById('cancel-reply').addEventListener('click', () => {
             if (easyMDEInstance) {
@@ -637,9 +718,7 @@ function renderNewTopicForm(categoryId) {
     const titleEl = document.getElementById('topic-title');
     const bodyEl = document.getElementById('topic-body');
 
-    easyMDEInstance = new EasyMDE({
-        element: bodyEl,
-        spellChecker: false,
+    easyMDEInstance = createEditor(bodyEl, {
         placeholder: "Enter your content here...",
         autosave: { enabled: true, uniqueId: draftKey, delay: 1000 },
     });
@@ -695,9 +774,7 @@ async function renderEditView(author, permlink) {
     const titleEl = document.getElementById('edit-title');
     const bodyEl = document.getElementById('edit-body');
 
-    easyMDEInstance = new EasyMDE({
-        element: bodyEl,
-        spellChecker: false,
+    easyMDEInstance = createEditor(bodyEl, {
         autosave: { enabled: true, uniqueId: draftKey, delay: 1000 }
     });
 
