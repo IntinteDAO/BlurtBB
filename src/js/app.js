@@ -418,6 +418,10 @@ function renderMarkdown(text) {
     return html;
 }
 
+function sanitizeId(str) {
+    return str.replace(/[^a-zA-Z0-9-_.]/g, '-');
+}
+
 async function renderPostView(author, permlink) {
     showLoader();
     if (blacklist.isBlacklisted(author, permlink)) {
@@ -450,7 +454,7 @@ async function renderPostView(author, permlink) {
     allReplies.sort((a, b) => new Date(a.created) - new Date(b.created));
 
     let html = `
-        <div class="card mb-3">
+        <div class="card mb-3" id="content-${sanitizeId(post.author)}-${sanitizeId(post.permlink)}">
             <div class="card-body">
                 <div class="row">
                     <div class="col-md-3 text-center border-end">
@@ -488,7 +492,7 @@ async function renderPostView(author, permlink) {
                             quoteHtml = `<blockquote class="blockquote-footer bg-light p-2 rounded-top"><a href="?post=@${reply.parent_author}/${reply.parent_permlink}">@${reply.parent_author}</a> wrote:<p class="mb-0 fst-italic">${parentBody}</p></blockquote>`;
                         }
             html += `
-                <div id="@${reply.author}/${reply.permlink}" class="list-group-item mt-3">
+                <div id="content-${sanitizeId(reply.author)}-${sanitizeId(reply.permlink)}" class="list-group-item mt-3">
                     <div class="row">
                         <div class="col-md-3 text-center border-end">
                             <a href="?profile=${reply.author}"><img src="${replyAvatarUrl}" alt="${reply.author}" class="rounded-circle mb-2" width="40" height="40"><h6 class="mb-0">@${reply.author}</h6></a>
@@ -668,28 +672,126 @@ function renderReplyForm(parentAuthor, parentPermlink, container) {
 
 function startPostViewPoller(user, author, permlink) {
     if (postViewPoller) clearInterval(postViewPoller);
+
     const renderVotes = async () => {
-        const data = await blockchain.getPostAndDirectReplies(author, permlink);
-        if (!data || !data.post) return;
-        const allContent = [data.post, ...data.replies];
-        allContent.forEach(content => {
-            if (!content) return;
-            const voteContainer = document.querySelector(`.vote-section[data-permlink="${content.permlink}"]`);
-            if (!voteContainer) return;
-            const userVoted = user && content.active_votes.some(v => v.voter === user);
-            const votersList = content.active_votes.map(v => `@${v.voter}`).join('<br>');
-            const newHtml = `
-                ${user ? `<button class="btn btn-sm ${userVoted ? 'btn-success' : 'btn-outline-success'} me-2 vote-btn" data-author="${content.author}" data-permlink="${content.permlink}"><i class="fas fa-thumbs-up"></i> <span>${userVoted ? 'Unvote' : 'Upvote'}</span></button>` : ''}
-                <button type="button" class="btn btn-link text-muted text-decoration-none p-0 vote-popover" data-bs-toggle="popover" data-bs-html="true" title="${content.active_votes.length} Voters" data-bs-content="${votersList || 'No votes yet.'}">
-                    ${content.title ? `Pending Payout: ${content.pending_payout_value}` : `<small>Payout: ${content.pending_payout_value}</small>`}
-                </button>`;
-            voteContainer.innerHTML = newHtml;
-        });
+        const post = await blockchain.getPostWithReplies(author, permlink);
+        if (!post || !post.author) return;
+
+        const allContent = [post];
+        function flattenReplies(replies) {
+            if (!replies) return;
+            replies.forEach(reply => {
+                allContent.push(reply);
+                flattenReplies(reply.replies);
+            });
+        }
+        flattenReplies(post.replies);
+
+                allContent.forEach(content => {
+
+                                        if (!content) return;
+
+                    
+
+                                        // Find the unique container for this specific piece of content first
+
+                                                            const contentContainer = document.getElementById(`content-${sanitizeId(content.author)}-${sanitizeId(content.permlink)}`);
+
+                                                            if (!contentContainer) return;
+
+                                        
+
+                                                            // Now find the vote section *within* that specific container
+
+                                                            const voteContainer = contentContainer.querySelector(`.vote-section`);
+
+                                                            if (!voteContainer) return;
+
+                                        
+
+                                                            const activeVotes = content.active_votes || []; // Ensure active_votes is an array
+
+                                                            const userVoted = user && activeVotes.some(v => v.voter === user);
+
+                                                                                const votersList = activeVotes.map(v => `@${v.voter}`).join('<br>');
+
+                                                            
+
+                                                                                // Payout display logic
+
+                                                                                const pendingPayout = parseFloat(content.pending_payout_value.split(' ')[0]);
+
+                                                                                let payoutHtml;
+
+                                                                                if (pendingPayout > 0) {
+
+                                                                                    payoutHtml = `Pending Payout: ${content.pending_payout_value}`;
+
+                                                                                } else {
+
+                                                                                    const totalPayout = parseFloat(content.total_payout_value.split(' ')[0]);
+
+                                                                                    const curatorPayout = parseFloat(content.curator_payout_value.split(' ')[0]);
+
+                                                                                    const finalPayout = (totalPayout + curatorPayout).toFixed(3);
+
+                                                                                    payoutHtml = `Total Payout: ${finalPayout} BLURT`;
+
+                                                                                }
+
+                                                            
+
+                                                                                // Manual check for post age (7-day voting window)
+
+                                                                                const postDate = new Date(content.created);
+
+                                                                                const sevenDaysAgo = new Date();
+
+                                                                                sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+                                                                                const canVote = postDate > sevenDaysAgo;
+
+                                                            
+
+                                                                                let voteButtonHtml = '';
+
+                                                                                if (user && canVote) {
+
+                                                                                    voteButtonHtml = `
+
+                                                                                        <button class="btn btn-sm ${userVoted ? 'btn-success' : 'btn-outline-success'} me-2 vote-btn" data-author="${content.author}" data-permlink="${content.permlink}">
+
+                                                                                            <i class="fas fa-thumbs-up"></i> <span>${userVoted ? 'Unvote' : 'Upvote'}</span>
+
+                                                                                        </button>`;
+
+                                                                                }
+
+                                                            
+
+                                                                                const popoverButtonHtml = `
+
+                                                                                    <button type="button" class="btn btn-link text-muted text-decoration-none p-0 vote-popover" data-bs-toggle="popover" data-bs-html="true" title="${activeVotes.length} Voters" data-bs-content="${votersList || 'No votes yet.'}">
+
+                                                                                        <small>${payoutHtml}</small>
+
+                                                                                    </button>`;
+
+                                                                                
+
+                                                                                voteContainer.innerHTML = voteButtonHtml + popoverButtonHtml;
+
+                                                                            });
+
         appContainer.querySelectorAll('[data-bs-toggle="popover"]').forEach(el => new window.bootstrap.Popover(el));
     };
+
     currentRenderVotes = renderVotes;
-    renderVotes();
-    postViewPoller = setInterval(renderVotes, 5000);
+    // Add a small delay for the initial render to ensure DOM is ready
+    setTimeout(() => {
+        renderVotes(); 
+        postViewPoller = setInterval(renderVotes, 5000);
+    }, 100); // 100ms delay
 }
 
 function renderNewTopicForm(categoryId) {
