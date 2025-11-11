@@ -382,10 +382,9 @@ async function renderCategoryView(categoryId) {
             }
 
             const lastPostAvatarUrl = blockchain.getAvatarUrl(topic.lastPostAuthor);
-            const lastPostHtml = `<div class="d-flex align-items-center" style="min-width: 180px;"><a href="?profile=${topic.lastPostAuthor}" class="me-2"><img src="${lastPostAvatarUrl}" class="rounded-circle" width="32" height="32" alt="${topic.lastPostAuthor}"></a><div><a href="?profile=${topic.lastPostAuthor}" class="text-break">@${topic.lastPostAuthor}</a><br><small class="text-muted"><a href="?post=@${topic.author}/${topic.permlink}" class="text-muted"><time datetime="${topic.lastPostDate}">${new Date(topic.lastPostDate).toLocaleString()}</time></a></small></div></div>`;
+            const lastPostHtml = `<div class="d-flex align-items-center" style="min-width: 180px;"><a href="?profile=${topic.lastPostAuthor}" class="me-2"><img src="${lastPostAvatarUrl}" class="rounded-circle" width="32" height="32" alt="${DOMPurify.sanitize(topic.lastPostAuthor)}"></a><div><a href="?profile=${topic.lastPostAuthor}" class="text-break">@${DOMPurify.sanitize(topic.lastPostAuthor)}</a><br><small class="text-muted"><a href="?post=@${topic.author}/${topic.permlink}" class="text-muted"><time datetime="${topic.lastPostDate}">${new Date(topic.lastPostDate).toLocaleString()}</time></a></small></div></div>`;
             
-            topicsHtml += `<li class="list-group-item"><div class="d-flex w-100 align-items-center">${notificationBellHtml}<div class="flex-grow-1"><h5 class="mb-1"><a href="?post=@${topic.author}/${topic.permlink}">${topic.title}</a></h5><small class="text-muted">By <a href="?profile=${topic.author}">@${topic.author}</a>, ${new Date(topic.created).toLocaleString()}</small></div><div class="text-center mx-4" style="min-width: 80px;"><span class="d-block fs-5">${topic.children}</span><small class="text-muted">replies</small></div>${lastPostHtml}</div></li>`;
-        });
+            topicsHtml += `<li class="list-group-item"><div class="d-flex w-100 align-items-center">${notificationBellHtml}<div class="flex-grow-1"><h5 class="mb-1"><a href="?post=@${topic.author}/${topic.permlink}">${DOMPurify.sanitize(topic.title)}</a></h5><small class="text-muted">By <a href="?profile=${topic.author}">@${DOMPurify.sanitize(topic.author)}</a>, ${new Date(topic.created).toLocaleString()}</small></div><div class="text-center mx-4" style="min-width: 80px;"><span class="d-block fs-5">${topic.children}</span><small class="text-muted">replies</small></div>${lastPostHtml}</div></li>`;        });
     } else {
         topicsHtml += '<li class="list-group-item">No topics found.</li>';
     }
@@ -415,7 +414,11 @@ function renderMarkdown(text) {
     tempMDE.toTextArea();
     document.body.removeChild(tempTextArea);
 
-    return html;
+    // Sanitize the HTML output to prevent XSS
+    return DOMPurify.sanitize(html, {
+        ALLOWED_TAGS: ['p', 'strong', 'em', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'a', 'img', 'blockquote', 'code', 'pre', 'br', 'hr', 'table', 'thead', 'tbody', 'tr', 'th', 'td'],
+        ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'style']
+    });
 }
 
 function sanitizeId(str) {
@@ -458,12 +461,12 @@ async function renderPostView(author, permlink) {
             <div class="card-body">
                 <div class="row">
                     <div class="col-md-3 text-center border-end">
-                        <a href="?profile=${post.author}"><img src="${postAuthorAvatarUrl}" alt="${post.author}" class="rounded-circle mb-2" width="60" height="60"><h5 class="mb-0">@${post.author}</h5></a>
+                        <a href="?profile=${post.author}"><img src="${postAuthorAvatarUrl}" alt="${DOMPurify.sanitize(post.author)}" class="rounded-circle mb-2" width="60" height="60"><h5 class="mb-0">@${DOMPurify.sanitize(post.author)}</h5></a>
                         ${getRoleBadge(post.author)}
                         <small class="text-muted d-block mt-2">Posted: ${new Date(post.created).toLocaleString()}</small>
                     </div>
                     <div class="col-md-9">
-                        <h1 class="card-title">${post.title}</h1>
+                        <h1 class="card-title">${DOMPurify.sanitize(post.title)}</h1>
                         <div class="card-text fs-5 mb-3 markdown-content">${renderMarkdown(post.body)}</div>
                         <div class="d-flex align-items-center justify-content-between mt-3">
                             <div class="d-flex align-items-center vote-section" data-author="${post.author}" data-permlink="${post.permlink}"></div>
@@ -495,7 +498,7 @@ async function renderPostView(author, permlink) {
                 <div id="content-${sanitizeId(reply.author)}-${sanitizeId(reply.permlink)}" class="list-group-item mt-3">
                     <div class="row">
                         <div class="col-md-3 text-center border-end">
-                            <a href="?profile=${reply.author}"><img src="${replyAvatarUrl}" alt="${reply.author}" class="rounded-circle mb-2" width="40" height="40"><h6 class="mb-0">@${reply.author}</h6></a>
+                            <a href="?profile=${reply.author}"><img src="${replyAvatarUrl}" alt="${DOMPurify.sanitize(reply.author)}" class="rounded-circle mb-2" width="40" height="40"><h6 class="mb-0">@${DOMPurify.sanitize(reply.author)}</h6></a>
                             ${getRoleBadge(reply.author)}
                             <small class="text-muted d-block mt-2">${new Date(reply.created).toLocaleString()}</small>
                         </div>
